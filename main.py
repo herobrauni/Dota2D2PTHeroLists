@@ -1,6 +1,7 @@
 import os
 import json
 import logging
+import winreg
 from utils.parsing import get_meta_cheatsheet
 from __init__ import __version__
 os.system('mkdir C:\\DotaMetaLogs\\')
@@ -78,26 +79,44 @@ def add_live_updates_config(json_data):
     
     return json_data
 
-def find_hero_grid_config_path():
-    '''
-    Searches for hero_grid_config.json in all drives for a Windows installation of Steam
-    '''
-    drives = ['C:', 'D:', 'E:', 'F:', 'G:', 'H:', 'I:', 'J:', 'K:', 'L:', 'M:', 'N:', 'O:', 'P:', 'Q:', 'R:', 'S:', 'T:', 'U:', 'V:', 'W:', 'X:', 'Y:', 'Z:']
-    for drive in drives:
-        steam_userdata_path = os.path.join(drive, 'Program Files (x86)', 'Steam', 'userdata')
-        if not os.path.exists(steam_userdata_path):
-            steam_userdata_path = os.path.join(drive, 'Steam', 'userdata')
-            if not os.path.exists(steam_userdata_path):
-                continue
-        
-        logging.info(f"Searching for hero_grid_config.json in {steam_userdata_path}")
-        
-        for root, dirs, files in os.walk(steam_userdata_path):
-            if 'hero_grid_config.json' in files and '570' in root.split(os.sep):
-                found_path = os.path.join(root, 'hero_grid_config.json')
-                logging.info(f"Found hero_grid_config.json at {found_path}")
-                return found_path
+def get_steam_install_path():
+    """
+    Retrieves the Steam installation path from the Windows Registry.
+    """
+    try:
+        key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Wow6432Node\Valve\Steam")
+        install_path, _ = winreg.QueryValueEx(key, "InstallPath")
+        winreg.CloseKey(key)
+        return install_path
+    except Exception as e:
+        logging.error(f"Failed to retrieve Steam install path from registry: {e}")
+        return None
 
+def find_hero_grid_config_path():
+    """
+    Searches for hero_grid_config.json in the Steam userdata directory.
+    """
+    steam_install_path = get_steam_install_path()
+    if not steam_install_path:
+        logging.error("Could not find Steam installation path.")
+        return None
+
+    logging.info(f"Steam install path found at: {steam_install_path}")
+    steam_userdata_path = os.path.join(steam_install_path, 'userdata')
+
+    if not os.path.exists(steam_userdata_path):
+        logging.error(f"Steam userdata path does not exist: {steam_userdata_path}")
+        return None
+
+    logging.info(f"Searching for hero_grid_config.json in {steam_userdata_path}")
+
+    for root, dirs, files in os.walk(steam_userdata_path):
+        if 'hero_grid_config.json' in files and '570' in root.split(os.sep):
+            found_path = os.path.join(root, 'hero_grid_config.json')
+            logging.info(f"Found hero_grid_config.json at {found_path}")
+            return found_path
+
+    logging.error("Could not find hero_grid_config.json in Steam userdata directory.")
     return None
 
 if __name__ == '__main__':
